@@ -1,0 +1,13 @@
+{
+    "name": "Support Chat",
+    "slug": "support-chat",
+    "version": "1.0.1",
+    "author": "MrGhozzi",
+    "author_url": "https://github.com/mrghozzi",
+    "description": "Adds local support chat, WhatsApp, and Messenger support channels with an admin inbox inside MYADS.",
+    "thumbnail": "thumbnail.png",
+    "latest": "https://github.com/mrghozzi/support-chat/releases/latest",
+    "siteweb": "https://github.com/mrghozzi/support-chat",
+    "min_myads": "4.2.4",
+    "ADStn_url": "myads-support-chat"
+}
