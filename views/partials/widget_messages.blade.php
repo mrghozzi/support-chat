@@ -8,14 +8,21 @@
 
 @forelse($messages as $message)
     @php
-        $isMine = $message->sender_type !== 'admin';
+        $isMine = in_array($message->sender_type, ['guest', 'member'], true);
+        $isAi = in_array($message->sender_type, ['ai', 'bot'], true);
+        $bubbleClass = $isMine ? 'is-mine' : ($isAi ? 'is-support is-ai' : 'is-support');
     @endphp
-    <article class="support-chat-widget__bubble {{ $isMine ? 'is-mine' : 'is-support' }}" data-message-id="{{ $message->id }}">
+    <article class="support-chat-widget__bubble {{ $bubbleClass }}" data-message-id="{{ $message->id }}">
         <div class="support-chat-widget__bubble-meta">
-            <strong>{{ $message->displayName() }}</strong>
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <strong>{{ $message->displayName() }}</strong>
+                @if($isAi)
+                    <span style="font-size: 10px; background: rgba(97, 93, 250, 0.15); color: #615dfa; padding: 2px 6px; border-radius: 99px; font-weight: 600;">🤖 AI</span>
+                @endif
+            </div>
             <span>{{ optional($message->created_at)->format('H:i') }}</span>
         </div>
-        <p>{{ $message->body }}</p>
+        <p>{!! nl2br(e($message->body)) !!}</p>
     </article>
 @empty
     @unless($itemsOnly ?? false)

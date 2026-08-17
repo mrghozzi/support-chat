@@ -69,6 +69,7 @@ class AdminSupportChatController extends Controller
             'assignees' => $this->service->adminAssignees(),
             'currentAdminId' => (int) $request->user()->getKey(),
             'externalUrl' => $this->service->externalUrl($settings),
+            'stats' => $this->service->dashboardStats(),
         ]);
     }
 
@@ -83,21 +84,85 @@ class AdminSupportChatController extends Controller
             'whatsapp_prefill' => ['nullable', 'string', 'max:400'],
             'messenger_url' => ['nullable', 'url', 'max:255'],
             'visibility_rules' => ['nullable', 'string', 'max:4000'],
+            'ai_enabled' => ['nullable', 'boolean'],
+            'ai_mode' => ['required', 'in:auto_reply,assist_admin,always_ai,off'],
+            'ai_provider' => ['required', 'in:pollinations,groq,gemini,openai'],
+            'ai_bot_name' => ['required', 'string', 'max:120'],
+            'pollinations_api_key' => ['nullable', 'string', 'max:500'],
+            'pollinations_model' => ['nullable', 'string', 'max:100'],
+            'groq_api_key' => ['nullable', 'string', 'max:500'],
+            'groq_model' => ['nullable', 'string', 'max:100'],
+            'gemini_api_key' => ['nullable', 'string', 'max:500'],
+            'gemini_model' => ['nullable', 'string', 'max:100'],
+            'openai_api_key' => ['nullable', 'string', 'max:500'],
+            'openai_model' => ['nullable', 'string', 'max:100'],
+            'ai_system_prompt' => ['nullable', 'string', 'max:4000'],
         ]);
 
         SupportChatSettings::save($validated + [
             'widget_enabled' => $request->boolean('widget_enabled'),
+            'ai_enabled' => $request->boolean('ai_enabled'),
         ]);
 
-        return redirect()->route('admin.support_chat.index')
+        $activeTab = $request->input('_tab', 'chat');
+
+        return redirect()->route('admin.support_chat.index', ['tab' => $activeTab])
             ->with('success', __('support_chat::messages.settings_saved'));
     }
 
-    public function reply(Request $request, int $threadId): JsonResponse
+    public function aiSuggest(Request $request, int $threadId): JsonResponse
     {
         try {
             $thread = $this->service->findThreadOrFail($threadId);
-            $message = $this->service->adminReply($thread, $request->user(), (string) $request->input('message', ''));
+            $instruction = trim((string) $request->input('instruction', ''));
+            $suggestion = $this->service->suggestAiAdminReply($thread, $instruction ?: null);
+
+            return response()->json([
+                'success' => true,
+                'suggestion' => $suggestion,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage() ?: __('messages.error_prefix'),
+            ], 500);
+        }
+    }
+
+    public function testAi(Request $request): JsonResponse
+    {
+        $request->validate([
+            'provider' => ['required', 'in:pollinations,groq,gemini,openai'],
+            'api_key' => ['nullable', 'string'],
+            'model' => ['nullable', 'string'],
+        ]);
+
+        $provider = (string) $request->input('provider');
+        $apiKey = (string) $request->input('api_key', '');
+        $model = (string) $request->input('model', '');
+
+        $result = $this->service->aiService()->testConnection($provider, $apiKey, $model);
+
+        return response()->json($result);
+    }
+
+    public function reply(Request $request, int $threadId): mixed
+    {
+        $wantsJson = $request->expectsJson() || $request->ajax();
+        $messageText = trim((string) $request->input('message', ''));
+
+        try {
+            $thread = $this->service->findThreadOrFail($threadId);
+
+            if (empty($messageText) && $request->isMethod('GET')) {
+                return redirect()->route('admin.support_chat.index', ['tab' => 'chat', 'thread' => $threadId]);
+            }
+
+            $message = $this->service->adminReply($thread, $request->user(), $messageText);
+
+            if (!$wantsJson) {
+                return redirect()->route('admin.support_chat.index', ['tab' => 'chat', 'thread' => $threadId]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -111,12 +176,21 @@ class AdminSupportChatController extends Controller
                 'status_label' => __('support_chat::messages.status_pending'),
             ]);
         } catch (ValidationException $exception) {
+            if (!$wantsJson) {
+                return redirect()->route('admin.support_chat.index', ['tab' => 'chat', 'thread' => $threadId])
+                    ->withErrors($exception->validator);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => $exception->errors()['message'][0] ?? $exception->getMessage(),
                 'errors' => $exception->errors(),
             ], 422);
         } catch (\Throwable) {
+            if (!$wantsJson) {
+                return redirect()->route('admin.support_chat.index', ['tab' => 'chat', 'thread' => $threadId]);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => __('messages.error_prefix'),

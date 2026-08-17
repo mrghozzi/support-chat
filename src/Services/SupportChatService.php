@@ -34,13 +34,52 @@ class SupportChatService
         private readonly SupportChatSchema $schema,
         private readonly SecurityPolicyService $securityPolicy,
         private readonly SecurityThrottleService $securityThrottle,
-        private readonly V420SchemaService $coreSchema
+        private readonly V420SchemaService $coreSchema,
+        private readonly SupportChatAiService $aiService
     ) {
+    }
+
+    public function aiService(): SupportChatAiService
+    {
+        return $this->aiService;
     }
 
     public function settings(): array
     {
         return SupportChatSettings::all();
+    }
+
+    public function dashboardStats(): array
+    {
+        $settings = $this->settings();
+        $totalThreads = 0;
+        $openThreads = 0;
+        $awaitingReplyThreads = 0;
+        $closedThreads = 0;
+        $aiMessagesCount = 0;
+
+        if ($this->schemaReady()) {
+            try {
+                $totalThreads = SupportChatThread::query()->count();
+                $openThreads = SupportChatThread::query()->where('status', 'open')->count();
+                $awaitingReplyThreads = SupportChatThread::query()->awaitingReply()->count();
+                $closedThreads = SupportChatThread::query()->where('status', 'closed')->count();
+                $aiMessagesCount = SupportChatMessage::query()->whereIn('sender_type', ['ai', 'bot'])->count();
+            } catch (\Throwable) {
+            }
+        }
+
+        return [
+            'total_threads' => $totalThreads,
+            'open_threads' => $openThreads,
+            'awaiting_reply' => $awaitingReplyThreads,
+            'closed_threads' => $closedThreads,
+            'ai_messages_count' => $aiMessagesCount,
+            'channel_mode' => (string) ($settings['channel_mode'] ?? 'local'),
+            'ai_provider' => (string) ($settings['ai_provider'] ?? 'pollinations'),
+            'ai_enabled' => !empty($settings['ai_enabled']),
+            'ai_mode' => (string) ($settings['ai_mode'] ?? 'auto_reply'),
+        ];
     }
 
     public function schemaReady(): bool
@@ -281,8 +320,12 @@ class SupportChatService
         );
 
         $body = $this->validateMessageBody((string) $payload['message']);
-        $this->appendMessage($thread, $body, $request->user());
+        $appended = $this->appendMessage($thread, $body, $request->user());
         $this->hitPublicThrottle($request);
+
+        if (!$appended['is_duplicate']) {
+            $this->handleAiAutoReplyIfEnabled($thread);
+        }
 
         return $this->findThreadOrFail((int) $thread->getKey());
     }
@@ -302,10 +345,71 @@ class SupportChatService
         $this->ensurePublicThrottleIsAvailable($request);
 
         $body = $this->validateMessageBody((string) $payload['message']);
-        $this->appendMessage($thread, $body, $request->user());
+        $appended = $this->appendMessage($thread, $body, $request->user());
         $this->hitPublicThrottle($request);
 
+        if (!$appended['is_duplicate']) {
+            $this->handleAiAutoReplyIfEnabled($thread);
+        }
+
         return $this->findThreadOrFail((int) $thread->getKey());
+    }
+
+    public function handleAiAutoReplyIfEnabled(SupportChatThread $thread): ?SupportChatMessage
+    {
+        $settings = $this->settings();
+        $aiEnabled = !empty($settings['ai_enabled']);
+        $aiMode = (string) ($settings['ai_mode'] ?? 'auto_reply');
+
+        if (!$aiEnabled || !in_array($aiMode, ['auto_reply', 'always_ai'], true)) {
+            return null;
+        }
+
+        // Deduplication 1: if the last message in this thread was already an AI message, do not duplicate!
+        $lastMessage = $thread->messages()->latest('id')->first();
+        if ($lastMessage && in_array($lastMessage->sender_type, ['ai', 'bot'], true)) {
+            return $lastMessage;
+        }
+
+        // Deduplication 2: if an AI message was created in this thread in the last 4 seconds, skip
+        $recentAi = $thread->messages()
+            ->whereIn('sender_type', ['ai', 'bot'])
+            ->where('created_at', '>=', now()->subSeconds(4))
+            ->exists();
+        if ($recentAi) {
+            return null;
+        }
+
+        try {
+            $reply = $this->aiService->generateReply($thread);
+            if (!empty($reply)) {
+                $message = $thread->messages()->create([
+                    'sender_type' => 'ai',
+                    'sender_user_id' => null,
+                    'sender_admin_id' => null,
+                    'body' => $reply,
+                    'created_at' => now(),
+                ]);
+
+                $thread->forceFill([
+                    'last_sender_type' => 'ai',
+                    'last_message_at' => now(),
+                ])->save();
+
+                return $message;
+            }
+        } catch (\Throwable $e) {
+            logger()->error('[SupportChatService] AI auto-reply error: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    public function suggestAiAdminReply(SupportChatThread $thread, ?string $instruction = null): string
+    {
+        $reply = $this->aiService->generateReply($thread, $instruction, true);
+
+        return !empty($reply) ? $reply : (string) __('support_chat::messages.ai_no_suggestion');
     }
 
     public function adminReply(SupportChatThread $thread, User $admin, string $body): SupportChatMessage
@@ -576,17 +680,20 @@ class SupportChatService
         }
     }
 
-    private function appendMessage(SupportChatThread $thread, string $body, ?User $user = null): SupportChatMessage
+    /**
+     * @return array{message: SupportChatMessage, is_duplicate: bool}
+     */
+    private function appendMessage(SupportChatThread $thread, string $body, ?User $user = null): array
     {
         $senderType = $user ? 'member' : 'guest';
         $senderUserId = $user ? (int) $user->getKey() : null;
 
         try {
-            // Deduplication: skip if identical message created in last 5 seconds
+            // Deduplication: skip if identical message created in last 4 seconds
             $duplicateQuery = $thread->messages()
                 ->where('body', $body)
                 ->where('sender_type', $senderType)
-                ->where('created_at', '>=', now()->subSeconds(5));
+                ->where('created_at', '>=', now()->subSeconds(4));
 
             if ($senderUserId === null) {
                 $duplicateQuery->whereNull('sender_user_id');
@@ -595,7 +702,10 @@ class SupportChatService
             }
 
             if ($duplicate = $duplicateQuery->first()) {
-                return $duplicate;
+                return [
+                    'message' => $duplicate,
+                    'is_duplicate' => true,
+                ];
             }
 
             $message = $thread->messages()->create([
@@ -612,7 +722,10 @@ class SupportChatService
                 'last_message_at' => now(),
             ])->save();
 
-            return $message;
+            return [
+                'message' => $message,
+                'is_duplicate' => false,
+            ];
         } catch (\Throwable) {
             throw ValidationException::withMessages([
                 'message' => __('messages.error_prefix'),

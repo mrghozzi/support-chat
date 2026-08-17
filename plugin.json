@@ -1,10 +1,10 @@
 {
     "name": "Support Chat",
     "slug": "support-chat",
-    "version": "1.0.1",
+    "version": "1.2.0",
     "author": "MrGhozzi",
     "author_url": "https://github.com/mrghozzi",
-    "description": "Adds local support chat, WhatsApp, and Messenger support channels with an admin inbox inside MYADS.",
+    "description": "Multi-channel local and external support chat powered by a multi-provider AI engine (Pollinations, Groq, Gemini, OpenAI) with a modern .superdesign admin dashboard.",
     "thumbnail": "thumbnail.png",
     "latest": "https://github.com/mrghozzi/support-chat/releases/latest",
     "siteweb": "https://github.com/mrghozzi/support-chat",

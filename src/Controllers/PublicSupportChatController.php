@@ -188,8 +188,17 @@ class PublicSupportChatController extends Controller
     public function message(Request $request): JsonResponse
     {
         try {
+            $latestBefore = (int) $request->input('latest_id', 0);
             $thread = $this->service->sendPublicMessage($request);
-            $messages = $this->service->threadMessages($thread, 6);
+            $messages = $this->service->threadMessages($thread, 10);
+            $newMessages = $latestBefore > 0
+                ? $messages->where('id', '>', $latestBefore)->values()
+                : $messages->slice(-2)->values();
+
+            if ($newMessages->isEmpty()) {
+                $newMessages = $messages->slice(-1)->values();
+            }
+
             $response = response()->json([
                 'success' => true,
                 'thread' => [
@@ -198,7 +207,7 @@ class PublicSupportChatController extends Controller
                     'participant_name' => $thread->participantName(),
                 ],
                 'html' => view('support_chat::partials.widget_messages', [
-                    'messages' => $messages->slice(-1),
+                    'messages' => $newMessages,
                     'thread' => $thread,
                     'currentPublicUserId' => (int) ($request->user()?->getKey() ?? 0),
                     'itemsOnly' => true,

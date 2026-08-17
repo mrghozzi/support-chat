@@ -30,10 +30,14 @@ Route::middleware(['web', 'auth', 'admin'])->group(function (): void {
         ->name('admin.support_chat.index');
     Route::post('/admin/support-chat/settings', [AdminSupportChatController::class, 'updateSettings'])
         ->name('admin.support_chat.settings.update');
+    Route::post('/admin/support-chat/test-ai', [AdminSupportChatController::class, 'testAi'])
+        ->name('admin.support_chat.ai.test');
     Route::get('/admin/support-chat/threads/{threadId}/poll', [AdminSupportChatController::class, 'poll'])
         ->name('admin.support_chat.threads.poll');
-    Route::post('/admin/support-chat/threads/{threadId}/reply', [AdminSupportChatController::class, 'reply'])
+    Route::match(['GET', 'POST'], '/admin/support-chat/threads/{threadId}/reply', [AdminSupportChatController::class, 'reply'])
         ->name('admin.support_chat.threads.reply');
+    Route::post('/admin/support-chat/threads/{threadId}/ai-suggest', [AdminSupportChatController::class, 'aiSuggest'])
+        ->name('admin.support_chat.threads.ai_suggest');
     Route::post('/admin/support-chat/threads/{threadId}/assign', [AdminSupportChatController::class, 'assign'])
         ->name('admin.support_chat.threads.assign');
     Route::post('/admin/support-chat/threads/{threadId}/status', [AdminSupportChatController::class, 'updateStatus'])

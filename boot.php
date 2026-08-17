@@ -6,6 +6,7 @@ use App\Helpers\Hooks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 use MyAds\Plugins\SupportChat\Middleware\InjectSupportChatWidget;
+use MyAds\Plugins\SupportChat\Services\SupportChatAiService;
 use MyAds\Plugins\SupportChat\Services\SupportChatSchema;
 use MyAds\Plugins\SupportChat\Services\SupportChatService;
 
@@ -42,6 +43,7 @@ if (!function_exists('support_chat_autoload_registered')) {
 support_chat_autoload_registered($supportChatNamespace, $supportChatBasePath);
 
 app()->singleton(SupportChatSchema::class, static fn (): SupportChatSchema => new SupportChatSchema());
+app()->singleton(SupportChatAiService::class, static fn (): SupportChatAiService => new SupportChatAiService());
 app()->singleton(InjectSupportChatWidget::class, static fn ($app): InjectSupportChatWidget => new InjectSupportChatWidget(
     $app->make(SupportChatService::class)
 ));
@@ -51,15 +53,20 @@ app()->singleton(
         $app->make(SupportChatSchema::class),
         $app->make(\App\Services\SecurityPolicyService::class),
         $app->make(\App\Services\SecurityThrottleService::class),
-        $app->make(\App\Services\V420SchemaService::class)
+        $app->make(\App\Services\V420SchemaService::class),
+        $app->make(SupportChatAiService::class)
     )
 );
 
 View::addNamespace('support_chat', __DIR__ . '/views');
 app('translator')->addNamespace('support_chat', __DIR__ . '/lang');
-app('router')->pushMiddlewareToGroup('web', InjectSupportChatWidget::class);
 
 Hooks::add_action('theme_master_head_end', static function (): void {
+    static $headRendered = false;
+    if ($headRendered) {
+        return;
+    }
+
     try {
         /** @var SupportChatService $service */
         $service = app(SupportChatService::class);
@@ -69,6 +76,7 @@ Hooks::add_action('theme_master_head_end', static function (): void {
             return;
         }
 
+        $headRendered = true;
         echo view('support_chat::partials.widget_head', $payload)->render();
     } catch (\Throwable $exception) {
         Log::warning('Support chat head hook skipped.', [
@@ -79,6 +87,11 @@ Hooks::add_action('theme_master_head_end', static function (): void {
 });
 
 Hooks::add_action('theme_master_before_body_close', static function (): void {
+    static $bodyRendered = false;
+    if ($bodyRendered) {
+        return;
+    }
+
     try {
         /** @var SupportChatService $service */
         $service = app(SupportChatService::class);
@@ -88,6 +101,7 @@ Hooks::add_action('theme_master_before_body_close', static function (): void {
             return;
         }
 
+        $bodyRendered = true;
         echo view('support_chat::partials.widget', $payload)->render();
     } catch (\Throwable $exception) {
         Log::warning('Support chat body hook skipped.', [
@@ -125,30 +139,4 @@ Hooks::add_action('admin_sidebar_menu', static function (): void {
         . $badgeHtml
         . '</a>'
         . '</li>';
-});
-
-View::composer('*', static function ($view): void {
-    try {
-        $viewName = method_exists($view, 'getName') ? (string) $view->getName() : '';
-        if (!in_array($viewName, ['theme::layouts.master', 'theme::layouts.app'], true)) {
-            return;
-        }
-
-        /** @var SupportChatService $service */
-        $service = app(SupportChatService::class);
-        $payload = $service->widgetPayload(request());
-
-        if (!$payload['should_render']) {
-            return;
-        }
-
-        $factory = $view->getFactory();
-        $factory->startPush('head', view('support_chat::partials.widget_head', $payload)->render());
-        $factory->startPush('scripts', view('support_chat::partials.widget', $payload)->render());
-    } catch (\Throwable $exception) {
-        Log::warning('Support chat widget injection skipped.', [
-            'plugin' => 'support-chat',
-            'reason' => $exception->getMessage(),
-        ]);
-    }
 });

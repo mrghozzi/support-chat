@@ -1,4 +1,9 @@
 (function () {
+  if (window.__supportChatLoaded) {
+    return;
+  }
+  window.__supportChatLoaded = true;
+
   function parseConfig(widget) {
     if (!widget || !widget.dataset) {
       return null;
@@ -18,6 +23,12 @@
     };
   }
 
+  function getToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return (meta ? meta.getAttribute('content') : '')
+      || (document.querySelector('input[name="_token"]') ? document.querySelector('input[name="_token"]').value : '');
+  }
+
   function requestJson(url, options) {
     return fetch(url, options).then(function (response) {
       return response.json().then(function (payload) {
@@ -30,6 +41,11 @@
   }
 
   function initWidget(widget) {
+    if (widget.dataset.supportChatInitialized === '1') {
+      return;
+    }
+    widget.dataset.supportChatInitialized = '1';
+
     var config = parseConfig(widget);
     if (!config) {
       return;
@@ -42,11 +58,10 @@
     var messages = widget.querySelector('[data-support-chat-messages]');
     var errorNode = widget.querySelector('[data-support-chat-error]');
     var guestFields = widget.querySelector('[data-support-chat-guest-fields]');
-    var csrfToken = document.querySelector('meta[name="csrf-token"]');
-    var token = csrfToken ? csrfToken.getAttribute('content') : '';
     var currentThread = null;
     var latestId = 0;
     var pollTimer = null;
+    var isSending = false;
 
     function threadHost() {
       return messages.querySelector('.support-chat-widget__thread') || messages;
@@ -125,7 +140,7 @@
     }
 
     function poll() {
-      if (!currentThread) {
+      if (!currentThread || isSending) {
         return;
       }
 
@@ -159,7 +174,6 @@
       });
     }
 
-    var isSending = false;
     var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     var originalBtnText = submitBtn ? submitBtn.textContent : '';
 
@@ -181,10 +195,11 @@
         isSending = true;
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.textContent = 'Sending...';
+          submitBtn.textContent = '...';
         }
 
         var actionUrl = currentThread ? config.messageUrl : config.startUrl;
+        formData.append('latest_id', String(latestId || 0));
         if (!currentThread) {
           formData.append('page_url', config.pageUrl || window.location.href);
           formData.append('page_title', config.pageTitle || document.title);
@@ -195,7 +210,7 @@
           headers: {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': token
+            'X-CSRF-TOKEN': getToken()
           },
           body: formData
         })
@@ -236,7 +251,22 @@
     });
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    Array.prototype.slice.call(document.querySelectorAll('[data-support-chat-widget]')).forEach(initWidget);
-  });
+  function bootstrap() {
+    var widgets = Array.prototype.slice.call(document.querySelectorAll('[data-support-chat-widget]'));
+    if (widgets.length > 1) {
+      // Remove any duplicate widget nodes in the DOM
+      for (var i = 1; i < widgets.length; i++) {
+        widgets[i].remove();
+      }
+    }
+    if (widgets.length > 0) {
+      initWidget(widgets[0]);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  } else {
+    bootstrap();
+  }
 })();

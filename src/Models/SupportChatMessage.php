@@ -48,6 +48,7 @@ class SupportChatMessage extends Model
     public function displayName(): string
     {
         return match ($this->sender_type) {
+            'ai', 'bot' => (string) (\MyAds\Plugins\SupportChat\SupportChatSettings::get('ai_bot_name') ?: __('support_chat::messages.ai_bot_default_name')),
             'admin' => (string) optional($this->senderAdmin)->username ?: __('support_chat::messages.support_team_label'),
             'member' => (string) optional($this->senderUser)->username ?: __('support_chat::messages.member_fallback_name'),
             'system' => __('support_chat::messages.system_label'),
@@ -58,6 +59,7 @@ class SupportChatMessage extends Model
     public function avatarUrl(): string
     {
         return match ($this->sender_type) {
+            'ai', 'bot' => asset('plugin-assets/support-chat/ai-avatar.png'),
             'admin' => optional($this->senderAdmin)->avatarUrl() ?: asset('upload/avatar.png'),
             'member' => optional($this->senderUser)->avatarUrl() ?: asset('upload/avatar.png'),
             default => asset('upload/avatar.png'),
@@ -67,5 +69,10 @@ class SupportChatMessage extends Model
     public function isPublicMessage(): bool
     {
         return in_array($this->sender_type, ['guest', 'member'], true);
+    }
+
+    public function isAiMessage(): bool
+    {
+        return in_array($this->sender_type, ['ai', 'bot'], true);
     }
 }
