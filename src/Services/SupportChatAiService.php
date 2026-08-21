@@ -123,34 +123,34 @@ class SupportChatAiService
     private function buildConversationPayload(SupportChatThread $thread, array $settings, ?string $customInstruction = null, bool $isAdminCoPilot = false): array
     {
         $siteName = (string) (config('app.name') ?: 'MYADS');
-        $botName = (string) ($settings['ai_bot_name'] ?? 'مساعد MYADS الذكي');
+        $botName = (string) ($settings['ai_bot_name'] ?? 'MYADS AI Assistant');
         $customPrompt = trim((string) ($settings['ai_system_prompt'] ?? ''));
 
         $visitorName = $thread->participantName();
-        $pageTitle = (string) ($thread->started_page_title ?: 'الصفحة الرئيسية');
+        $pageTitle = (string) ($thread->started_page_title ?: 'Home Page');
         $pageUrl = (string) ($thread->started_page_url ?: '');
 
-        $systemPrompt = "أنت '{$botName}'، المساعد الذكي الرسمي للدعم الفني لمنصة {$siteName} (منصة الإعلانات الرقمية، المتجر، المنتدى، ومجتمع أصحاب المواقع).\n";
-        $systemPrompt .= "اسم المستخدم الحالي: {$visitorName}\n";
+        $systemPrompt = "You are '{$botName}', the official intelligent technical support assistant for {$siteName} platform (digital advertising, marketplace, forum, and publisher community).\n";
+        $systemPrompt .= "Current visitor/user name: {$visitorName}\n";
         if (!empty($pageTitle) && $pageTitle !== 'Unknown Page') {
-            $systemPrompt .= "الصفحة التي يتصفحها الزائر: {$pageTitle} ({$pageUrl})\n\n";
+            $systemPrompt .= "Browsing context: {$pageTitle} ({$pageUrl})\n\n";
         }
 
         if (!empty($customPrompt)) {
-            $systemPrompt .= "### تعليمات إضافية من الإدارة:\n{$customPrompt}\n\n";
+            $systemPrompt .= "### Administrator Custom Guidelines:\n{$customPrompt}\n\n";
         } else {
-            $systemPrompt .= "### إرشادات الرد:\n";
-            $systemPrompt .= "1. أجب بلباقة ولطف باللغة العربية بأسلوب احترافي ومختصر ومباشر.\n";
-            $systemPrompt .= "2. قدّم إجابات واضحة ودقيقة حول خدمات الموقع، التبادل الإعلاني، النقاط PTS، والمتجر.\n";
-            $systemPrompt .= "3. إذا كان الاستفسار معقداً أو يتطلب تدخلاً إدارياً، أخبر الزائر بأن فريق الدعم سيتابع طلبه.\n";
+            $systemPrompt .= "### Response Guidelines:\n";
+            $systemPrompt .= "1. Respond politely, professionally, concisely, and directly. Always reply in the user's preferred language (match the language of the inquiry).\n";
+            $systemPrompt .= "2. Provide clear, accurate help regarding platform services, ad exchange, PTS points, and marketplace features.\n";
+            $systemPrompt .= "3. If the request requires administrative intervention or manual review, inform the user that the support team will follow up shortly.\n";
         }
 
         if ($isAdminCoPilot) {
-            $systemPrompt .= "\n[وضع مساعد الأدمن]: المطلوب منك صياغة مسودة رد جاهزة ومهنية ليرسلها مسؤول الدعم مباشرة للمستخدم دون مقدمات إضافية.\n";
+            $systemPrompt .= "\n[Admin Co-Pilot Mode]: Draft a ready-to-send, professional support message for the administrator to review and send directly to the customer.\n";
         }
 
         if (!empty($customInstruction)) {
-            $systemPrompt .= "\n[توجيه من الأدمن بخصوص الرد]: {$customInstruction}\n";
+            $systemPrompt .= "\n[Admin Guidance]: {$customInstruction}\n";
         }
 
         $payload = [
@@ -206,7 +206,7 @@ class SupportChatAiService
         if (empty($apiKey) && !empty($userMessage)) {
             try {
                 $encodedPrompt = rawurlencode($userMessage);
-                $url = "https://text.pollinations.ai/{$encodedPrompt}?model=openai";
+                $url = "https://text.pollinations.ai/{$encodedPrompt}?model=" . rawurlencode($model);
                 if (!empty($systemInstruction)) {
                     $url .= "&system=" . rawurlencode(Str::limit($systemInstruction, 180));
                 }
@@ -322,23 +322,40 @@ class SupportChatAiService
         }
 
         $systemInstructionText = '';
-        $geminiContents = [];
+        $rawGeminiContents = [];
 
         foreach ($messages as $msg) {
             $role = $msg['role'] ?? 'user';
-            $content = (string) ($msg['content'] ?? '');
+            $content = trim((string) ($msg['content'] ?? ''));
+            if ($content === '') {
+                continue;
+            }
 
             if ($role === 'system') {
                 $systemInstructionText .= ($systemInstructionText ? "\n\n" : '') . $content;
             } elseif ($role === 'assistant') {
-                $geminiContents[] = [
+                $rawGeminiContents[] = [
                     'role' => 'model',
-                    'parts' => [['text' => $content]],
+                    'text' => $content,
                 ];
             } else {
-                $geminiContents[] = [
+                $rawGeminiContents[] = [
                     'role' => 'user',
-                    'parts' => [['text' => $content]],
+                    'text' => $content,
+                ];
+            }
+        }
+
+        // Merge consecutive turns with the same role to strictly alternate user/model
+        $geminiContents = [];
+        foreach ($rawGeminiContents as $item) {
+            $lastIndex = count($geminiContents) - 1;
+            if ($lastIndex >= 0 && $geminiContents[$lastIndex]['role'] === $item['role']) {
+                $geminiContents[$lastIndex]['parts'][0]['text'] .= "\n\n" . $item['text'];
+            } else {
+                $geminiContents[] = [
+                    'role' => $item['role'],
+                    'parts' => [['text' => $item['text']]],
                 ];
             }
         }
@@ -346,7 +363,7 @@ class SupportChatAiService
         if (empty($geminiContents)) {
             $geminiContents[] = [
                 'role' => 'user',
-                'parts' => [['text' => 'مرحبا']],
+                'parts' => [['text' => 'Hello']],
             ];
         }
 
@@ -435,10 +452,22 @@ class SupportChatAiService
         $visitor = $thread->participantName();
         $siteName = (string) (config('app.name') ?: 'MYADS');
 
-        if ($isAdminCoPilot) {
-            return "أهلاً بك {$visitor}، شكراً لتواصلك معنا في منصة {$siteName}. بخصوص استفسارك، يسعدنا تقديم المساعدة المطلوبة وسيقوم فريق الدعم الفني بمتابعة طلبك فوراً.";
+        // Extract last user message to make the fallback contextual and helpful
+        $lastUserMsg = $thread->messages()
+            ->whereIn('sender_type', ['guest', 'member'])
+            ->latest('id')
+            ->value('body');
+
+        $topic = '';
+        if (!empty($lastUserMsg)) {
+            $cleaned = trim(preg_replace('/\s+/', ' ', (string) $lastUserMsg));
+            $topic = ' regarding: "' . Str::limit($cleaned, 75) . '", ';
         }
 
-        return "مرحباً بك {$visitor}! يسعدنا تواصلك مع فريق الدعم في {$siteName}. تم استلام رسالتك بنجاح، وسيقوم فريقنا بمتابعة استفسارك وتقديم المساعدة في أقرب وقت.";
+        if ($isAdminCoPilot) {
+            return "Hello {$visitor}, thank you for contacting {$siteName} support.{$topic}We are glad to help, and our support team will follow up on your request with the necessary details shortly.";
+        }
+
+        return "Hello {$visitor}! Thank you for reaching out to {$siteName} support.{$topic}Your message has been received, and our team will follow up to assist you as soon as possible.";
     }
 }

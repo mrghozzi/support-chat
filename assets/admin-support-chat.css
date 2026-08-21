@@ -111,12 +111,17 @@
 /* ================= HEXAGONAL AVATARS (.superdesign) ================= */
 .support-chat-avatar-hex-wrap {
     position: relative;
-    width: 36px;
-    height: 40px;
+    width: 36px !important;
+    height: 40px !important;
+    max-width: 36px !important;
+    max-height: 40px !important;
+    min-width: 36px !important;
+    min-height: 40px !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
     filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.08));
     transition: transform 0.25s ease;
 }
@@ -147,13 +152,18 @@
 }
 
 .support-chat-avatar-hex-img,
-.support-chat-avatar-hex-content {
+.support-chat-avatar-hex-content,
+img.support-chat-avatar-hex-img {
     position: relative;
     z-index: 2;
-    width: 32px;
-    height: 36px;
+    width: 32px !important;
+    height: 36px !important;
+    max-width: 32px !important;
+    max-height: 36px !important;
+    min-width: 32px !important;
+    min-height: 36px !important;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    object-fit: cover;
+    object-fit: cover !important;
     background: var(--admin-premium-surface, #ffffff);
     display: flex;
     align-items: center;
@@ -162,26 +172,44 @@
 
 /* In message bubbles */
 .support-chat-bubble .support-chat-avatar-hex-wrap {
-    width: 32px;
-    height: 36px;
+    width: 32px !important;
+    height: 36px !important;
+    max-width: 32px !important;
+    max-height: 36px !important;
+    min-width: 32px !important;
+    min-height: 36px !important;
 }
 
 .support-chat-bubble .support-chat-avatar-hex-img,
-.support-chat-bubble .support-chat-avatar-hex-content {
-    width: 28px;
-    height: 32px;
+.support-chat-bubble .support-chat-avatar-hex-content,
+.support-chat-bubble img.support-chat-avatar-hex-img {
+    width: 28px !important;
+    height: 32px !important;
+    max-width: 28px !important;
+    max-height: 32px !important;
+    min-width: 28px !important;
+    min-height: 32px !important;
 }
 
 /* Large Hexagon for Sidebar */
 .support-chat-avatar-hex-wrap.is-lg {
-    width: 64px;
-    height: 72px;
+    width: 64px !important;
+    height: 72px !important;
+    max-width: 64px !important;
+    max-height: 72px !important;
+    min-width: 64px !important;
+    min-height: 72px !important;
 }
 
 .support-chat-avatar-hex-wrap.is-lg .support-chat-avatar-hex-img,
-.support-chat-avatar-hex-wrap.is-lg .support-chat-avatar-hex-content {
-    width: 58px;
-    height: 66px;
+.support-chat-avatar-hex-wrap.is-lg .support-chat-avatar-hex-content,
+.support-chat-avatar-hex-wrap.is-lg img.support-chat-avatar-hex-img {
+    width: 58px !important;
+    height: 66px !important;
+    max-width: 58px !important;
+    max-height: 66px !important;
+    min-width: 58px !important;
+    min-height: 66px !important;
 }
 
 /* ================= 3-COLUMN WORKSPACE ================= */
@@ -445,3 +473,31 @@ html.app-skin-dark .dark-surface {
 html.app-skin-dark .dark-text {
     color: #eef2ff !important;
 }
+
+/* --- AI GENERATING ANIMATIONS & OVERLAY --- */
+.ai-generating-overlay {
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    transition: all 0.25s ease-in-out;
+    z-index: 15;
+}
+
+@keyframes aiGlowPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.45);
+        border-color: #0ea5e9;
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(14, 165, 233, 0.18);
+        border-color: #38bdf8;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+        border-color: inherit;
+    }
+}
+
+.support-chat-ai-highlight {
+    animation: aiGlowPulse 1.6s ease-in-out;
+}
+

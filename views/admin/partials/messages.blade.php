@@ -15,18 +15,18 @@
     <article class="support-chat-bubble {{ $bubbleClass }}" data-message-id="{{ $message->id }}">
         <div class="support-chat-bubble__avatar">
             @if($isAiMessage)
-                <div class="support-chat-avatar-hex-wrap is-ai-avatar">
-                    <div class="support-chat-avatar-hex-content bg-soft-info text-info">
+                <div class="support-chat-avatar-hex-wrap is-ai-avatar" style="width: 32px; height: 36px; min-width: 32px; max-width: 32px;">
+                    <div class="support-chat-avatar-hex-content bg-soft-info text-info" style="width: 28px; height: 32px; max-width: 28px; max-height: 32px;">
                         <i class="feather-cpu fs-5"></i>
                     </div>
                 </div>
             @elseif($isAdminMessage)
-                <div class="support-chat-avatar-hex-wrap is-admin-avatar">
-                    <img src="{{ $message->avatarUrl() }}" alt="{{ $message->displayName() }}" class="support-chat-avatar-hex-img">
+                <div class="support-chat-avatar-hex-wrap is-admin-avatar" style="width: 32px; height: 36px; min-width: 32px; max-width: 32px;">
+                    <img src="{{ $message->avatarUrl() }}" alt="{{ $message->displayName() }}" class="support-chat-avatar-hex-img" style="width: 28px; height: 32px; max-width: 28px; max-height: 32px; object-fit: cover;" width="28" height="32">
                 </div>
             @else
-                <div class="support-chat-avatar-hex-wrap is-user-avatar">
-                    <img src="{{ $message->avatarUrl() }}" alt="{{ $message->displayName() }}" class="support-chat-avatar-hex-img">
+                <div class="support-chat-avatar-hex-wrap is-user-avatar" style="width: 32px; height: 36px; min-width: 32px; max-width: 32px;">
+                    <img src="{{ $message->avatarUrl() }}" alt="{{ $message->displayName() }}" class="support-chat-avatar-hex-img" style="width: 28px; height: 32px; max-width: 28px; max-height: 32px; object-fit: cover;" width="28" height="32">
                 </div>
             @endif
         </div>

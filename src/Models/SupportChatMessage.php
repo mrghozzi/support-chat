@@ -59,7 +59,7 @@ class SupportChatMessage extends Model
     public function avatarUrl(): string
     {
         return match ($this->sender_type) {
-            'ai', 'bot' => asset('plugin-assets/support-chat/ai-avatar.png'),
+            'ai', 'bot' => asset('upload/avatar.png'),
             'admin' => optional($this->senderAdmin)->avatarUrl() ?: asset('upload/avatar.png'),
             'member' => optional($this->senderUser)->avatarUrl() ?: asset('upload/avatar.png'),
             default => asset('upload/avatar.png'),

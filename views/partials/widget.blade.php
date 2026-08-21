@@ -51,7 +51,9 @@
         </section>
     </div>
     <script>
+@if(\Illuminate\Support\Facades\File::exists(base_path('plugins/support-chat/assets/support-chat.js')))
 {!! \Illuminate\Support\Facades\File::get(base_path('plugins/support-chat/assets/support-chat.js')) !!}
+@endif
     </script>
 @else
     <a

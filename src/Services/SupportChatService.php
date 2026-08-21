@@ -161,6 +161,7 @@ class SupportChatService
         }
 
         match ($filter) {
+            'all' => $query,
             'awaiting_reply' => $query->awaitingReply(),
             'closed' => $query->where('status', 'closed'),
             default => $query->where('status', '!=', 'closed'),

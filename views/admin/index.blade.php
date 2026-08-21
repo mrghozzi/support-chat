@@ -17,8 +17,17 @@
     $currentProvider = (string) ($settings['ai_provider'] ?? 'pollinations');
 @endphp
 
-@section('content')
+@push('styles')
 <link rel="stylesheet" href="{{ route('support_chat.asset', ['path' => 'admin-support-chat.css']) }}">
+<style>
+@if(\Illuminate\Support\Facades\File::exists(base_path('plugins/support-chat/assets/admin-support-chat.css')))
+{!! \Illuminate\Support\Facades\File::get(base_path('plugins/support-chat/assets/admin-support-chat.css')) !!}
+@endif
+</style>
+@endpush
+
+@section('content')
+
 
 <div class="support-chat-admin-shell">
     {{-- Superdesign Admin Hero --}}
@@ -255,8 +264,8 @@
                                         href="{{ route('admin.support_chat.index', ['tab' => 'chat', 'filter' => $filter, 'q' => $search, 'thread' => $thread->id]) }}"
                                         class="support-chat-thread-card p-3 mb-2 rounded-3 d-flex align-items-start gap-3 {{ $activeThread && (int) $activeThread->id === (int) $thread->id ? 'is-active bg-soft-primary border-primary' : 'bg-transparent' }}"
                                     >
-                                        <div class="support-chat-avatar-hex-wrap {{ $thread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} flex-shrink-0">
-                                            <img src="{{ $thread->participantAvatarUrl() }}" alt="{{ $thread->participantName() }}" class="support-chat-avatar-hex-img">
+                                        <div class="support-chat-avatar-hex-wrap {{ $thread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} flex-shrink-0" style="width: 36px; height: 40px; min-width: 36px; max-width: 36px;">
+                                            <img src="{{ $thread->participantAvatarUrl() }}" alt="{{ $thread->participantName() }}" class="support-chat-avatar-hex-img" style="width: 32px; height: 36px; max-width: 32px; max-height: 36px; object-fit: cover;" width="32" height="36">
                                         </div>
                                         <div class="support-chat-thread-card__body flex-grow-1 min-w-0">
                                             <div class="d-flex align-items-center justify-content-between mb-1">
@@ -295,8 +304,8 @@
                             @if($activeThread)
                                 <header class="support-chat-conversation__header p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
                                     <div class="d-flex align-items-center gap-3">
-                                        <div class="support-chat-avatar-hex-wrap {{ $activeThread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} flex-shrink-0">
-                                            <img src="{{ $activeThread->participantAvatarUrl() }}" alt="{{ $activeThread->participantName() }}" class="support-chat-avatar-hex-img">
+                                        <div class="support-chat-avatar-hex-wrap {{ $activeThread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} flex-shrink-0" style="width: 36px; height: 40px; min-width: 36px; max-width: 36px;">
+                                            <img src="{{ $activeThread->participantAvatarUrl() }}" alt="{{ $activeThread->participantName() }}" class="support-chat-avatar-hex-img" style="width: 32px; height: 36px; max-width: 32px; max-height: 36px; object-fit: cover;" width="32" height="36">
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-2">
@@ -342,6 +351,7 @@
                                             type="button"
                                             class="btn btn-sm btn-info text-white rounded-pill px-3 d-inline-flex align-items-center gap-2 shadow-sm"
                                             id="btn-ai-suggest"
+                                            data-ai-suggest-btn
                                             data-action="{{ route('admin.support_chat.threads.ai_suggest', $activeThread->id) }}"
                                         >
                                             <i class="feather-sparkles"></i>
@@ -351,14 +361,11 @@
                                     <div class="ai-suggestion-box mt-3 p-3 bg-white dark-surface rounded-3 border shadow-sm d-none" id="ai-suggestion-box">
                                         <div class="d-flex align-items-center justify-content-between mb-2">
                                             <div class="d-flex align-items-center gap-2">
-                                                <span class="badge bg-soft-info text-info fs-11"><i class="feather-cpu me-1"></i>{{ __('support_chat::messages.ai_bot_default_name') }}</span>
-                                                <span class="text-muted fs-11 fst-italic">{{ __('support_chat::messages.ai_suggest_reply') }}</span>
+                                                <span class="badge bg-soft-success text-success fs-11"><i class="feather-check-circle me-1"></i>{{ __('support_chat::messages.ai_suggest_reply') }}</span>
+                                                <span class="text-muted fs-11 fst-italic">{{ __('support_chat::messages.ai_bot_default_name') }}</span>
                                             </div>
                                             <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" id="btn-apply-suggestion">
-                                                    <i class="feather-check me-1"></i> {{ __('support_chat::messages.apply_suggestion') }}
-                                                </button>
-                                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2" id="btn-dismiss-suggestion">
+                                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2" id="btn-dismiss-suggestion" title="{{ __('support_chat::messages.close_label') }}">
                                                     <i class="feather-x"></i>
                                                 </button>
                                             </div>
@@ -384,13 +391,21 @@
                                             rows="3"
                                             placeholder="{{ __('support_chat::messages.reply_placeholder') }}"
                                         ></textarea>
+                                        <div class="ai-generating-overlay position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 dark-surface rounded-3 d-none align-items-center justify-content-center flex-column gap-2" id="ai-generating-overlay">
+                                            <div class="d-flex align-items-center gap-2 text-info">
+                                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                                <span class="fs-13 fw-bold"><i class="feather-sparkles me-1"></i> {{ __('support_chat::messages.ai_suggesting') }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="support-chat-compose__footer d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
                                         <div class="d-flex align-items-center gap-2">
                                             <button
                                                 type="button"
                                                 class="btn btn-sm btn-outline-info rounded-pill px-3 d-inline-flex align-items-center gap-1"
-                                                onclick="document.getElementById('btn-ai-suggest').click()"
+                                                id="btn-ai-suggest-bottom"
+                                                data-ai-suggest-btn
+                                                data-action="{{ route('admin.support_chat.threads.ai_suggest', $activeThread->id) }}"
                                             >
                                                 <i class="feather-sparkles"></i>
                                                 <span>{{ __('support_chat::messages.ai_suggest_reply') }}</span>
@@ -423,8 +438,8 @@
 
                             @if($activeThread)
                                 <div class="p-3 border-bottom text-center">
-                                    <div class="support-chat-avatar-hex-wrap is-lg {{ $activeThread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} mx-auto mb-2">
-                                        <img src="{{ $activeThread->participantAvatarUrl() }}" alt="{{ $activeThread->participantName() }}" class="support-chat-avatar-hex-img">
+                                    <div class="support-chat-avatar-hex-wrap is-lg {{ $activeThread->isGuestThread() ? 'is-guest-avatar' : 'is-user-avatar' }} mx-auto mb-2" style="width: 64px; height: 72px; min-width: 64px; max-width: 64px;">
+                                        <img src="{{ $activeThread->participantAvatarUrl() }}" alt="{{ $activeThread->participantName() }}" class="support-chat-avatar-hex-img" style="width: 58px; height: 66px; max-width: 58px; max-height: 66px; object-fit: cover;" width="58" height="66">
                                     </div>
                                     <h6 class="fw-bold mb-1 text-dark dark-text">{{ $activeThread->participantName() }}</h6>
                                     @if($activeThread->isGuestThread())
@@ -866,6 +881,7 @@
         testAiUrl: "{{ route('admin.support_chat.ai.test') }}",
         csrfToken: "{{ csrf_token() }}"
     };
+    window.supportChatAiSuggestingText = "{{ __('support_chat::messages.ai_suggesting') }}";
 </script>
 <script src="{{ route('support_chat.asset', ['path' => 'admin-support-chat.js']) }}"></script>
 @endpush

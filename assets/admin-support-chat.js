@@ -65,7 +65,12 @@
     container.innerHTML = html;
     Array.prototype.slice.call(container.children).forEach(function (child) {
       if (child.getAttribute && child.getAttribute('data-message-id')) {
-        latestId = Math.max(latestId, parseInt(child.getAttribute('data-message-id') || '0', 10));
+        var id = child.getAttribute('data-message-id');
+        latestId = Math.max(latestId, parseInt(id || '0', 10));
+        // UI Deduplication: skip if already in DOM
+        if (inner.querySelector('[data-message-id="' + id + '"]')) {
+          return;
+        }
       }
       inner.appendChild(child);
     });
@@ -151,42 +156,76 @@
   }
 
   // --- AI Suggest Reply Co-Pilot ---
-  if (btnAiSuggest && aiSuggestionBox && aiSuggestionText) {
-    btnAiSuggest.addEventListener('click', function () {
-      var actionUrl = btnAiSuggest.getAttribute('data-action');
-      if (!actionUrl) return;
+  var aiSuggestBtns = document.querySelectorAll('[data-ai-suggest-btn]');
+  var aiGeneratingOverlay = document.getElementById('ai-generating-overlay');
 
-      var origHtml = btnAiSuggest.innerHTML;
-      btnAiSuggest.disabled = true;
-      btnAiSuggest.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> جاري التوليد...';
+  if (aiSuggestBtns.length > 0) {
+    aiSuggestBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var actionUrl = btn.getAttribute('data-action') || (btnAiSuggest ? btnAiSuggest.getAttribute('data-action') : null);
+        if (!actionUrl) return;
 
-      postData(actionUrl, new FormData())
-        .then(function (payload) {
-          if (payload && payload.success && payload.suggestion) {
-            aiSuggestionText.textContent = payload.suggestion;
-            aiSuggestionBox.classList.remove('d-none');
-          } else {
-            alert((payload && payload.message) ? payload.message : 'تعذر توليد الاقتراح.');
-          }
-        })
-        .catch(function (err) {
-          alert('خطأ أثناء الاتصال بالذكاء الاصطناعي: ' + err.message);
-        })
-        .finally(function () {
-          btnAiSuggest.disabled = false;
-          btnAiSuggest.innerHTML = origHtml;
+        // Set loading state on ALL AI suggest buttons
+        var origStates = [];
+        aiSuggestBtns.forEach(function (b) {
+          origStates.push({ el: b, html: b.innerHTML });
+          b.disabled = true;
+          b.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> ' + (window.supportChatAiSuggestingText || 'جاري التوليد...');
         });
+
+        // Show overlay in textarea
+        if (aiGeneratingOverlay) {
+          aiGeneratingOverlay.classList.remove('d-none');
+          aiGeneratingOverlay.classList.add('d-flex');
+        }
+
+        postData(actionUrl, new FormData())
+          .then(function (payload) {
+            if (payload && payload.success && payload.suggestion) {
+              var replyText = payload.suggestion.trim();
+
+              // 1. Directly insert into textarea
+              if (textarea) {
+                textarea.value = replyText;
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.max(80, textarea.scrollHeight) + 'px';
+                textarea.classList.remove('support-chat-ai-highlight');
+                // trigger reflow
+                void textarea.offsetWidth;
+                textarea.classList.add('support-chat-ai-highlight');
+                textarea.focus();
+              }
+
+              // 2. Also update suggestion box
+              if (aiSuggestionBox && aiSuggestionText) {
+                aiSuggestionText.textContent = replyText;
+                aiSuggestionBox.classList.remove('d-none');
+              }
+            } else {
+              alert((payload && payload.message) ? payload.message : 'تعذر توليد الاقتراح.');
+            }
+          })
+          .catch(function (err) {
+            alert('خطأ أثناء الاتصال بالذكاء الاصطناعي: ' + err.message);
+          })
+          .finally(function () {
+            // Restore buttons
+            origStates.forEach(function (item) {
+              item.el.disabled = false;
+              item.el.innerHTML = item.html;
+            });
+
+            // Hide overlay
+            if (aiGeneratingOverlay) {
+              aiGeneratingOverlay.classList.remove('d-flex');
+              aiGeneratingOverlay.classList.add('d-none');
+            }
+          });
+      });
     });
 
-    if (btnApplySuggestion && textarea) {
-      btnApplySuggestion.addEventListener('click', function () {
-        textarea.value = aiSuggestionText.textContent.trim();
-        textarea.focus();
-        aiSuggestionBox.classList.add('d-none');
-      });
-    }
-
-    if (btnDismissSuggestion) {
+    if (btnDismissSuggestion && aiSuggestionBox) {
       btnDismissSuggestion.addEventListener('click', function () {
         aiSuggestionBox.classList.add('d-none');
       });

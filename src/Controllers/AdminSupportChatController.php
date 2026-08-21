@@ -64,7 +64,7 @@ class AdminSupportChatController extends Controller
             'threads' => $threads,
             'activeThread' => $activeThread,
             'messages' => $messages,
-            'filter' => in_array($filter, ['open', 'awaiting_reply', 'closed'], true) ? $filter : 'open',
+            'filter' => in_array($filter, ['all', 'open', 'awaiting_reply', 'closed'], true) ? $filter : 'open',
             'search' => $search,
             'assignees' => $this->service->adminAssignees(),
             'currentAdminId' => (int) $request->user()->getKey(),
