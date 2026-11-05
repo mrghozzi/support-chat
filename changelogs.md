@@ -1,5 +1,11 @@
 # Support Chat - Changelog
 
+## v1.3.0 - 2026-11-05
+* **Platform Compatibility**: Fully tested and verified compatibility with MYADS v4.7.0, Laravel 12, and Dual DocumentRoot setups.
+* **Max Version Bump**: Updated `max_myads` requirement to `4.7.x`.
+* **Security & CSP**: Verified widget loading under strict security headers and Turnstile verification.
+* **Navigation Integration**: Explicitly registered `settings_url` to `/admin/support-chat`.
+
 ## v1.2.0
 * **Feature**: Multi-Provider AI Support Engine supporting Pollinations.ai (keyless or tokenized), Groq Cloud API (Llama 3.3), Google Gemini API (Gemini 2.0 / 1.5), and OpenAI API (GPT-4o / GPT-4o-mini).
 * **Feature**: Instant 24/7 AI Auto-Reply to public visitors and community members with rich site/page context.
