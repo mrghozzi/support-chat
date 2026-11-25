@@ -1,7 +1,7 @@
 {
     "name": "Support Chat",
     "slug": "support-chat",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "author": "MrGhozzi",
     "author_url": "https://github.com/mrghozzi",
     "description": "Multi-channel local and external support chat powered by a multi-provider AI engine (Pollinations, Groq, Gemini, OpenAI) with a modern .superdesign admin dashboard.",

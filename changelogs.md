@@ -1,5 +1,8 @@
 # Support Chat - Changelog
 
+## v1.3.1 - 2026-11-26
+* **Security (`PublicSupportChatController::asset`)**: Enforced trailing directory separator containment, traversal/null-byte checks, strict static asset MIME whitelisting (removing raw `svg`/`text/plain` fallbacks), and `X-Content-Type-Options: nosniff` headers.
+
 ## v1.3.0 - 2026-11-05
 * **Platform Compatibility**: Fully tested and verified compatibility with MYADS v4.7.0, Laravel 12, and Dual DocumentRoot setups.
 * **Max Version Bump**: Updated `max_myads` requirement to `4.7.x`.

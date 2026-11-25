@@ -20,11 +20,15 @@ class PublicSupportChatController extends Controller
 
     public function asset(string $path)
     {
+        if (str_contains($path, "\0") || str_contains($path, '..')) {
+            abort(404);
+        }
+
         $assetBase = realpath(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'assets');
         abort_if($assetBase === false, 404);
 
         $assetPath = realpath($assetBase . DIRECTORY_SEPARATOR . ltrim($path, '/\\'));
-        $normalizedBase = str_replace('\\', '/', mb_strtolower((string) $assetBase));
+        $normalizedBase = rtrim(str_replace('\\', '/', mb_strtolower((string) $assetBase)), '/') . '/';
         $normalizedAsset = str_replace('\\', '/', mb_strtolower((string) $assetPath));
 
         abort_if(
@@ -32,17 +36,23 @@ class PublicSupportChatController extends Controller
             404
         );
 
-        $extension = pathinfo($assetPath, PATHINFO_EXTENSION);
-        $mimeType = match (strtolower($extension)) {
-            'css' => 'text/css',
-            'js' => 'application/javascript',
+        $extension = strtolower(pathinfo($assetPath, PATHINFO_EXTENSION));
+        $mimeType = match ($extension) {
+            'css' => 'text/css; charset=UTF-8',
+            'js' => 'application/javascript; charset=UTF-8',
             'png' => 'image/png',
-            'svg' => 'image/svg+xml',
-            default => 'text/plain',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'woff2' => 'font/woff2',
+            'woff' => 'font/woff',
+            default => null,
         };
+
+        abort_if($mimeType === null, 404);
 
         return response()->file($assetPath, [
             'Content-Type' => $mimeType,
+            'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'public, max-age=300',
         ]);
     }
